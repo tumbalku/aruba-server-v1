@@ -18,6 +18,7 @@ public class UserResponse {
 
   private String id;
   private String name;
+  private String avatar;
   private String email;
   private String phone;
   private Gender gender;

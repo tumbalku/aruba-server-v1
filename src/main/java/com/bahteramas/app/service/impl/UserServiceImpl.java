@@ -3,6 +3,7 @@ package com.bahteramas.app.service.impl;
 import com.bahteramas.app.entity.*;
 import com.bahteramas.app.model.response.SimpleUserResponse;
 import com.bahteramas.app.security.BCrypt;
+import com.bahteramas.app.service.ImageService;
 import com.bahteramas.app.utils.Helper;
 import com.bahteramas.app.model.request.UserRequest;
 import com.bahteramas.app.model.request.UserSearchRequest;
@@ -20,8 +21,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,6 +39,7 @@ public class UserServiceImpl implements UserService {
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
   private final AddressServiceImpl addressService;
+  private final ImageService imageService;
 
   @Override
   public User getUser(String id) {
@@ -169,6 +173,18 @@ public class UserServiceImpl implements UserService {
     candidate.setUpdatedAt(LocalDateTime.now());
     userRepository.save(candidate);
     return Helper.userToResponse(candidate);
+  }
+
+  @Override
+  @Transactional
+  public void updaterAvatar(User user, MultipartFile file) throws IOException {
+
+    // supaya tidak buang buang memory
+    if(Objects.nonNull(user.getAvatar())){
+      imageService.removePrevImage(user.getAvatar());
+    }
+    user.setAvatar(imageService.saveImageToDb(file));
+    userRepository.save(user);
   }
 
   @Override

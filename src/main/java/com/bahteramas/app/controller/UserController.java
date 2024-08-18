@@ -12,7 +12,9 @@ import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -91,6 +93,20 @@ public class UserController implements GenericController<String, UserRequest, We
     UserResponse response = userService.find(id);
     return WebResponse.<UserResponse>builder()
             .data(response)
+            .build();
+  }
+
+
+  @PatchMapping(path = "/avatar",
+          produces = MediaType.APPLICATION_JSON_VALUE)
+  public WebResponse<String> updaterAvatar(User user,
+                                           @RequestParam("avatar") MultipartFile file) throws IOException {
+
+    userService.updaterAvatar(user, file);
+
+    return WebResponse.<String>builder()
+            .data("OK")
+            .message("avatar has been updated")
             .build();
   }
 }

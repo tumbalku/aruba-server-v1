@@ -1,23 +1,25 @@
 package com.bahteramas.app.service.impl;
 
-import com.bahteramas.app.model.request.CutiDecisionRequest;
-import com.bahteramas.app.model.request.CutiDetailRequest;
-import com.bahteramas.app.model.request.EmailRequest;
+import com.bahteramas.app.entity.*;
+import com.bahteramas.app.model.request.*;
+import com.bahteramas.app.model.response.CutiResponse;
 import com.bahteramas.app.repository.UserRepository;
 import com.bahteramas.app.service.text.CutiPdfService;
 import com.bahteramas.app.utils.Helper;
-import com.bahteramas.app.entity.Cuti;
-import com.bahteramas.app.entity.CutiStatus;
-import com.bahteramas.app.entity.CutiType;
-import com.bahteramas.app.entity.User;
-import com.bahteramas.app.model.request.CutiRequest;
-import com.bahteramas.app.model.response.CutiResponse;
 import com.bahteramas.app.repository.CutiRepository;
 import com.bahteramas.app.service.CutiService;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.core.io.Resource;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.UrlResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -33,6 +35,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -186,6 +189,14 @@ public class CutiServiceImpl implements CutiService {
     return Helper.cutiToResponse(cuti);
   }
 
+  @Transactional
+  public void delete() {
+    LocalDate thresholdDate = LocalDate.now().minusDays(30);
+    List<Cuti> expiredLeaves = cutiRepository.findByDateEndBefore(thresholdDate);
+    cutiRepository.deleteAll(expiredLeaves);
+    System.out.println("Expired leave records deleted: " + expiredLeaves.size());
+  }
+
   @Override
   @Scheduled(cron = "0 0 2 * * ?")
   public void deleteExpiredLeaveRecords() {
@@ -211,5 +222,35 @@ public class CutiServiceImpl implements CutiService {
   @Transactional(readOnly = true)
   public CutiResponse find(String id) {
     return Helper.cutiToResponse(getCuti(id));
+  }
+
+  @Transactional(readOnly = true)
+  public Page<CutiResponse> searchCuti(SearchCutiRequest request){
+
+    int page = request.getPage() - 1;
+
+    Specification<Cuti> specification = (root, query, builder) -> {
+      List<Predicate> predicates = new ArrayList<>();
+
+      Join<Cuti, User> userJoin = root.join("user", JoinType.LEFT);
+      if (Objects.nonNull(request.getName())) {
+        predicates.add(builder.like(userJoin.get("name"), "%" + request.getName() + "%"));
+      }
+
+      if(Objects.nonNull(request.getType())){
+        predicates.add(builder.equal(root.get("type"), CutiType.valueOf(request.getType())));
+      }
+
+
+      return query.where(predicates.toArray(new Predicate[]{})).getRestriction();
+    };
+
+    Pageable pageable = PageRequest.of(page, request.getSize());
+    Page<Cuti> users = cutiRepository.findAll(specification, pageable);
+    List<CutiResponse> userResponse = users.getContent().stream()
+            .map(Helper::cutiToResponse)
+            .collect(Collectors.toList());
+
+    return new PageImpl<>(userResponse, pageable, users.getTotalElements());
   }
 }

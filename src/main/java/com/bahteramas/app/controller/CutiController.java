@@ -1,15 +1,17 @@
 package com.bahteramas.app.controller;
 
 import com.bahteramas.app.entity.User;
-import com.bahteramas.app.model.request.CutiDecisionRequest;
-import com.bahteramas.app.model.request.CutiDetailRequest;
-import com.bahteramas.app.model.request.CutiRequest;
+import com.bahteramas.app.model.request.*;
 import com.bahteramas.app.model.response.CutiResponse;
+import com.bahteramas.app.model.response.UserResponse;
 import com.bahteramas.app.model.response.WebResponse;
+import com.bahteramas.app.model.response.WebResponseWithPaging;
 import com.bahteramas.app.service.impl.CutiServiceImpl;
+import com.bahteramas.app.utils.Helper;
 import com.google.zxing.WriterException;
 import org.springframework.core.io.Resource;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.apache.commons.io.IOUtils;
 import org.springframework.http.HttpStatus;
@@ -28,6 +30,28 @@ import java.util.List;
 public class CutiController implements GenericController<String, CutiRequest, WebResponse<?>>{
 
   private final CutiServiceImpl cutiService;
+
+  @GetMapping(path = "search", produces = MediaType.APPLICATION_JSON_VALUE)
+  public WebResponseWithPaging<List<CutiResponse>> search (User user,
+                                                           @RequestParam(name = "name", required = false) String name,
+                                                           @RequestParam(name = "type", required = false) String type,
+                                                           @RequestParam(name = "page", required = false, defaultValue = "1") Integer page,
+                                                           @RequestParam(name = "size", required = false, defaultValue = "10") Integer size){
+
+    SearchCutiRequest request = new SearchCutiRequest();
+    request.setName(name);
+    request.setType(type);
+    request.setPage(page);
+    request.setSize(size);
+
+    Page<CutiResponse> responses = cutiService.searchCuti(request);
+
+    return WebResponseWithPaging.<List<CutiResponse>>builder()
+            .data(responses.getContent())
+            .message("Search Success")
+            .pagination(Helper.getPagingResponse(responses))
+            .build();
+  }
 
   @GetMapping("/download/{id}")
   public ResponseEntity<byte[]> downloadFile(User user,
@@ -97,6 +121,15 @@ public class CutiController implements GenericController<String, CutiRequest, We
     } else {
       return ResponseEntity.status(500).body("Failed to delete file");
     }
+  }
+
+  @DeleteMapping("/junk")
+  public WebResponse<String> deleteFile(User user) {
+    cutiService.delete();
+    return WebResponse.<String>builder()
+            .data("OK")
+            .message("Old cuti has been removed")
+            .build();
   }
 
   @Override
